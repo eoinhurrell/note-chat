@@ -70,66 +70,18 @@ def _combine_documents(
     return document_separator.join(doc_strings)
 
 
-from operator import itemgetter
-
-from langchain.memory import ConversationBufferMemory
-
-memory = ConversationBufferMemory(
-    return_messages=True, output_key="answer", input_key="question"
-)
-
-# First we add a step to load memory
-# This adds a "memory" key to the input object
-loaded_memory = RunnablePassthrough.assign(
-    chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"),
-)
-# Now we calculate the standalone question
-standalone_question = {
-    "standalone_question": {
-        "question": lambda x: x["question"],
-        "chat_history": lambda x: get_buffer_string(x["chat_history"]),
-    }
+_inputs = RunnableParallel(
+    standalone_question=RunnablePassthrough.assign(
+        chat_history=lambda x: get_buffer_string(x["chat_history"])
+    )
     | CONDENSE_QUESTION_PROMPT
-    | model
+    | ChatOllama(model="llama2", temperature=0)
     | StrOutputParser(),
-}
-# Now we retrieve the documents
-retrieved_documents = {
-    "docs": itemgetter("standalone_question") | retriever,
+)
+_context = {
+    "context": itemgetter("standalone_question") | retriever | _combine_documents,
     "question": lambda x: x["standalone_question"],
 }
-# Now we construct the inputs for the final prompt
-final_inputs = {
-    "context": lambda x: _combine_documents(x["docs"]),
-    "question": itemgetter("question"),
-}
-# And finally, we do the part that returns the answers
-answer = {
-    "answer": final_inputs | ANSWER_PROMPT | model,
-    "docs": itemgetter("docs"),
-}
-# And now we put it all together!
-final_chain = loaded_memory | standalone_question | retrieved_documents | answer
+conversational_qa_chain = _inputs | _context | ANSWER_PROMPT | ChatOllama(model="llama2",)
 
-inputs = {"question": "Tell me about covid 19 vaccines"}
-result = final_chain.invoke(inputs)
-print(result)
-
-
-# # Note that the memory does not save automatically
-# # This will be improved in the future
-# # For now you need to save it yourself
-# memory.save_context(inputs, {"answer": result["answer"].content})
-
-# memory.load_memory_variables({})
-
-# {'history': [HumanMessage(content='where did harrison work?'),
-#   AIMessage(content='Harrison was employed at Kensho.')]}
-
-# inputs = {"question": "but where did he really work?"}
-# result = final_chain.invoke(inputs)
-# result
-
-# {'answer': AIMessage(content='Harrison actually worked at Kensho.'),
-#  'docs': [Document(page_content='harrison worked at kensho')]}
 import ipdb; ipdb.set_trace()

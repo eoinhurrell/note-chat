@@ -9,6 +9,7 @@ langchain = "*"
 tqdm = "*"
 faiss-gpu = "*"
 ipdb = "*"
+streamlit = "*"
 
 [dev-packages]
 
