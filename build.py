@@ -7,7 +7,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.document_loaders import ObsidianLoader
 
-loader = ObsidianLoader("/mnt/d/Dropbox/Tasks")
+loader = ObsidianLoader("/mnt/d/obsidian-vault")
 docs = loader.load()
 
 # print(docs[0])
